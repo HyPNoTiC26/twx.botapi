@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+import sys
+from time import sleep
+from twx.botapi import TelegramBot, ReplyKeyboardMarkup #Telegram Bot API
+import traceback
+from pyowm import OWM #API del Clima
+"""
+Inicializamos nuestro Bot y el API del Clima
+"""
+TOKEN = <token>
+OWMKEY = <OWMKEY>
+bot = TelegramBot(TOKEN) 
+bot.update_bot_info().wait()  #Esperamos por un mensaje entrante
+print bot.username 
+last_update_id = 0 
+def process_message(bot, u): #Este es el procedimiento que se ejecuta al llegar un mensaje 
+    #Vamos a utilizar un Teclado customizado 
+    keyboard = [['Get Weather']] #Al teclado le agregaremos un Boton de Obtener el clima 
+    reply_markup = ReplyKeyboardMarkup.create(keyboard) #Aqui creamos el teclado 
+    if u.message.sender and u.message.text and u.message.chat: #Si el mensaje tiene un chatID y un contenido de texto entonces lo identificamos como texto
+        chat_id = u.message.chat.id 
+        user = u.message.sender.username
+        message = u.message.text 
+        print chat_id 
+        print message 
+        if message == 'Get Weather': #Si el usuario esta enviando el comando correcto para obtener el clima entonces preguntamos su ubicación 
+            bot.send_message(chat_id, 'please send me your location') 
+        else: 
+            bot.send_message(chat_id, 'please select an option', reply_markup=reply_markup).wait() #Si no contiene el comando entonces mostramos las opciones de nuevo
+ 
+    elif u.message.location: #Si el mensaje contiene una ubicación entonces generamos el clima en ese sitio 
+        print u.message.location 
+        chat_id = u.message.chat.id 
+        owm = OWM(OWMKEY) #inicializamos el API del clima
+        obs = owm.weather_at_coords(u.message.location.latitude, u.message.location.longitude) #creamos un observation 
+        w = obs.get_weather() #creamos un objeto Weather como w 
+        print(w) # <Weather - reference time=2013-12-18 09:20, status=Clouds> 
+        l = obs.get_location() # creamos una ubicacion respecto al objeto weather 
+        status = str(w.get_detailed_status()) 
+        placename = str(l.get_name()) 
+        wtime = str(w.get_reference_time(timeformat='iso')) 
+        temperature = str(w.get_temperature('celsius').get('temp'))
+        bot.send_message(chat_id, 'Weather Status: ' +status +' At '+placename+' ' +wtime+' Temperature: '+ temperature+ 'C') #Enviamos la respuesta con el clima
+        bot.send_message(chat_id, 'please select an option', reply_markup=reply_markup).wait() #enviamos de nuevo el teclado para que lo muestre en pantalla
+    else: 
+        print u bot.send_message(chat_id, 'please select an option', reply_markup=reply_markup).wait() 
+while True: #Este loop sirve para esperar por los mensajes entrantes
+    updates = bot.get_updates(offset = last_update_id).wait() #esperamos y obtenemos el mensaje
+    try: 
+        for update in updates: #obtenemos los datos del mensaje
+            if int(update.update_id) > int(last_update_id): #si el mensaje que estamos recibiendo es nuevo entonces, procesarlo
+                last_update_id = update.update_id 
+                process_message(bot, update) #lo enviamos a la función que lo procesa 
+                continue 
+        continue 
+    except Exception: 
+        ex = None 
+        print traceback.format_exc() 
+        continue
